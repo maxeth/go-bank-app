@@ -3,7 +3,7 @@ package config
 import "os"
 
 const (
-	Source = "postgresql://postgres:secret@localhost:5433/bank_app?sslmode=disable"
+	Source = "postgresql://postgres:secret@localhost:5432/bank_app?sslmode=disable"
 	Driver = "postgres"
 )
 
