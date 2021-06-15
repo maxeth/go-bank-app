@@ -50,7 +50,7 @@ func TestTransferTx(t *testing.T) {
 
 		require.NotZero(t, trf.ID, trf.CreatedAt)
 
-		_, err = repo.Queries.GetTransfer(context.Background(), trf.ID)
+		_, err = repo.GetTransfer(context.Background(), trf.ID)
 		require.NoError(t, err)
 
 		// assert from-entry records
