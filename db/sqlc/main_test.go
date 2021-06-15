@@ -13,7 +13,7 @@ var (
 
 func TestMain(m *testing.M) {
 
-	dbConn := GetOrCreate()
+	dbConn, _ := GetOrCreate()
 
 	testQueries = New(dbConn.DB)
 
