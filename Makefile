@@ -19,4 +19,11 @@ sqlc-gen:
 test:
 	go test -v -cover ./...
 
-.PHONY: postgres createdb dropdb migrateup migratedown
+server:
+	go run main.go
+
+mock-db: 
+	mockgen -package mockdb -destination ./db/mock/repository.go github.com/maxeth/go-bank-app/db/sqlc Repository
+
+
+.PHONY: postgres createdb dropdb migrateup migratedown server mock-db sqlc-gen 
