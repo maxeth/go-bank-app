@@ -11,22 +11,25 @@ type TestDB struct {
 }
 
 var (
-	conf   config.Config = config.New()
 	testDB *sql.DB
 )
 
-func GetOrCreate() *TestDB {
+func GetOrCreate() (*TestDB, error) {
+	conf, err := config.New(".")
+	if err != nil {
+		return nil, err
+	}
 
 	if testDB == nil || testDB.Ping() != nil {
 		// not connected yet, either testDB var is nil or Ping() returned an error
 		var err error
-		testDB, err = sql.Open(conf.Driver, conf.ConnectionString)
+		testDB, err = sql.Open(conf.DBDriver, conf.DBString)
 		if err != nil {
-			panic("cannot connect to db")
+			return nil, err
 		}
-		return &TestDB{DB: testDB}
+		return &TestDB{DB: testDB}, nil
 	}
 
 	// already have a connection
-	return &TestDB{DB: testDB}
+	return &TestDB{DB: testDB}, nil
 }
