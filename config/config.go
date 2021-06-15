@@ -1,6 +1,8 @@
 package config
 
-import "os"
+import (
+	"github.com/spf13/viper"
+)
 
 const (
 	Source = "postgresql://postgres:secret@localhost:5432/bank_app?sslmode=disable"
@@ -8,23 +10,24 @@ const (
 )
 
 type Config struct {
-	Environment      string
-	ConnectionString string
-	Driver           string
+	Environment   string
+	DBString      string `mapstructure:"DB_STRING"`
+	DBDriver      string `mapstructure:"DB_DRIVER"`
+	ServerAddress string `mapstructure:"SERVER_ADDRESS"`
 }
 
-func getConfigValue(envName string, defaultValue string) string {
-	if val, ok := os.LookupEnv(envName); ok {
-		return val
+func New(path string) (config Config, err error) {
+	viper.AddConfigPath(path)
+	viper.SetConfigName("app")
+	viper.SetConfigType("env")
+
+	viper.AutomaticEnv()
+	err = viper.ReadInConfig()
+	if err != nil {
+		return Config{}, err
 	}
 
-	return defaultValue
-}
+	err = viper.Unmarshal(&config)
 
-func New() Config {
-	return Config{
-		Environment:      getConfigValue("ENV", "local"),
-		ConnectionString: getConfigValue("CONN_STRING", Source),
-		Driver:           getConfigValue("CONN_DRIVER", Driver),
-	}
+	return
 }
