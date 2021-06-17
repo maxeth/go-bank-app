@@ -15,9 +15,9 @@ var (
 )
 
 func GetOrCreate() (*TestDB, error) {
-	conf, err := config.New(".")
+	conf, err := config.New()
 	if err != nil {
-		return nil, err
+		panic("couldn't load env file")
 	}
 
 	if testDB == nil || testDB.Ping() != nil {
