@@ -16,8 +16,8 @@ type Config struct {
 	ServerAddress string `mapstructure:"SERVER_ADDRESS"`
 }
 
-func New() (config Config, err error) {
-	viper.AddConfigPath(".")
+func New(path string) (config Config, err error) {
+	viper.AddConfigPath(path) // this refers to the path of the file/directory that calls this function, not the path of this config.go function
 	viper.SetConfigName("app")
 	viper.SetConfigType("env")
 
