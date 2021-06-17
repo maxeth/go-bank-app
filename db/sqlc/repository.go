@@ -33,10 +33,10 @@ func (repo *SQLRepository) execTx(ctx context.Context, fn func(*Queries) error) 
 	}
 
 	query := New(tx)
+	err = fn(query) // call the actual sql execution function
 
-	// call higher order function passed as argument
-	err = fn(query)
 	if err != nil {
+		// try to rollback
 		if rbErr := tx.Rollback(); rbErr != nil {
 			// transaction failed, couldn't rollback
 			return fmt.Errorf("tx error: %v, rollback error: %v", err, rbErr)
@@ -103,11 +103,10 @@ func (repo *SQLRepository) TransferTx(ctx context.Context, arg TransferTxParams)
 			return err
 		}
 
-		// arrange the order of accounts inside the sql transcations based on the account id
-		// this is necessary to prevent a deadlock. all transaction operations should follow this pattern
-		// of ordering by some unique key such as the id
 		var args AddMoneyParams
-
+		// arrange the order of accounts inside the sql transcations query based on the account id
+		// this is necessary to prevent a deadlock. all transaction operations should follow this pattern
+		// of ordering by some unique key such as the id so a deadlock situation never occurs
 		if arg.FromAccountID < arg.ToAccountID {
 			args = AddMoneyParams{arg.ToAccountID, arg.FromAccountID, arg.Amount, -arg.Amount}
 		} else {
