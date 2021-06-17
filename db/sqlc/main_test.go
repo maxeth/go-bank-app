@@ -1,6 +1,7 @@
 package db
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
@@ -13,7 +14,11 @@ var (
 
 func TestMain(m *testing.M) {
 
-	dbConn, _ := GetOrCreate()
+	dbConn, err := GetOrCreate()
+	if err != nil {
+		fmt.Println(err.Error())
+		panic("Cannot test because db connection fails")
+	}
 
 	testQueries = New(dbConn.DB)
 
