@@ -9,9 +9,15 @@ dropdb:
 
 migrateup:
 	migrate -path db/migration -database "postgresql://postgres:secret@localhost:5432/bank_app?sslmode=disable" -verbose up
-	 
+
+migrateupone:
+	migrate -path db/migration -database "postgresql://postgres:secret@localhost:5432/bank_app?sslmode=disable" -verbose up 1
+ 
 migratedown:
-	migrate -path db/migration -database "postgresql://postgres:secret@localhost:5432/bank_app?sslmode=disable" -verbose up
+	migrate -path db/migration -database "postgresql://postgres:secret@localhost:5432/bank_app?sslmode=disable" -verbose down
+
+migratedownone:
+	migrate -path db/migration -database "postgresql://postgres:secret@localhost:5432/bank_app?sslmode=disable" -verbose down 1
 
 sqlc-gen:
 	MSYS_NO_PATHCONV=1 docker run --rm -v $(pwd):/src -w /src kjconroy/sqlc generate
@@ -22,8 +28,8 @@ test:
 server:
 	go run main.go
 
-mock-db: 
+mockdb: 
 	mockgen -package mockdb -destination ./db/mock/repository.go github.com/maxeth/go-bank-app/db/sqlc Repository
 
 
-.PHONY: postgres createdb dropdb migrateup migratedown server mock-db sqlc-gen 
+.PHONY: postgres createdb dropdb migrateup migratedown server mock-db sqlc-gen migrateupone migratedownone test
