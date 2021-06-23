@@ -14,16 +14,11 @@ var (
 	testDB *sql.DB
 )
 
-func GetOrCreate() (*TestDB, error) {
-	conf, err := config.New("../../")
-	if err != nil {
-		panic("couldn't load env file")
-	}
-
+func GetOrCreate(c config.Config) (*TestDB, error) {
 	if testDB == nil || testDB.Ping() != nil {
 		// not connected yet, either testDB var is nil or Ping() returned an error
 		var err error
-		testDB, err = sql.Open(conf.DBDriver, conf.DBString)
+		testDB, err = sql.Open(c.DBDriver, c.DBString)
 		if err != nil {
 			return nil, err
 		}
