@@ -8,18 +8,24 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang/mock/gomock"
+	"github.com/maxeth/go-bank-app/auth"
 	mockdb "github.com/maxeth/go-bank-app/db/mock"
 	db "github.com/maxeth/go-bank-app/db/sqlc"
 	"github.com/stretchr/testify/require"
 )
 
 func TestCreateTransfer(t *testing.T) {
-	accA := generateRandomAccount()
-	accB := generateRandomAccount()
-	accC := generateRandomAccount()
+	userA, _ := randomUser(t)
+	userB, _ := randomUser(t)
+	userC, _ := randomUser(t)
+
+	accA := generateRandomAccount(userA.Username)
+	accB := generateRandomAccount(userB.Username)
+	accC := generateRandomAccount(userC.Username)
 
 	transferAmount := int64(10)
 
@@ -30,6 +36,7 @@ func TestCreateTransfer(t *testing.T) {
 	testCases := []struct {
 		name          string
 		body          gin.H
+		setupAuth     func(t *testing.T, req *http.Request, tm auth.TokenMaker)
 		buildStubs    func(repo *mockdb.MockRepository)
 		checkResponse func(resRec *httptest.ResponseRecorder)
 	}{
@@ -40,6 +47,10 @@ func TestCreateTransfer(t *testing.T) {
 				"toAccountID":   accB.ID,
 				"amount":        transferAmount,
 				"currency":      accA.Currency,
+			},
+			setupAuth: func(t *testing.T, req *http.Request, tm auth.TokenMaker) {
+				// create a token witht he randomly created users username so that the requests are not being rejected
+				addAuthToHeader(t, req, tm, time.Minute, authTypeBearer, userA.Username)
 			},
 			buildStubs: func(repo *mockdb.MockRepository) {
 				// the GetAccount method is beind called inside the handler when checking whether both accounts have the same currency / enough balance
@@ -67,6 +78,9 @@ func TestCreateTransfer(t *testing.T) {
 				"amount":        transferAmount,
 				"currency":      accA.Currency,
 			},
+			setupAuth: func(t *testing.T, req *http.Request, tm auth.TokenMaker) {
+				addAuthToHeader(t, req, tm, time.Minute, authTypeBearer, userA.Username)
+			},
 			buildStubs: func(repo *mockdb.MockRepository) {
 				repo.EXPECT().
 					GetAccount(gomock.Any(), gomock.Eq(accA.ID)).
@@ -91,6 +105,9 @@ func TestCreateTransfer(t *testing.T) {
 				"amount":        transferAmount,
 				"currency":      accA.Currency,
 			},
+			setupAuth: func(t *testing.T, req *http.Request, tm auth.TokenMaker) {
+				addAuthToHeader(t, req, tm, time.Minute, authTypeBearer, userA.Username)
+			},
 			buildStubs: func(repo *mockdb.MockRepository) {
 				repo.EXPECT().
 					GetAccount(gomock.Any(), gomock.Eq(accA.ID)).
@@ -104,7 +121,6 @@ func TestCreateTransfer(t *testing.T) {
 				repo.EXPECT().TransferTx(gomock.Any(), gomock.Any()).Times(0)
 			},
 			checkResponse: func(resRec *httptest.ResponseRecorder) {
-				fmt.Println(resRec.Code)
 				require.Equal(t, http.StatusNotFound, resRec.Code)
 			},
 		},
@@ -115,6 +131,9 @@ func TestCreateTransfer(t *testing.T) {
 				"toAccountID":   accB.ID,
 				"amount":        transferAmount,
 				"currency":      "ABCDEFG",
+			},
+			setupAuth: func(t *testing.T, req *http.Request, tm auth.TokenMaker) {
+				addAuthToHeader(t, req, tm, time.Minute, authTypeBearer, userA.Username)
 			},
 			buildStubs: func(repo *mockdb.MockRepository) {
 				repo.EXPECT().
@@ -139,6 +158,9 @@ func TestCreateTransfer(t *testing.T) {
 				"toAccountID":   accC.ID,
 				"amount":        transferAmount,
 				"currency":      "USD",
+			},
+			setupAuth: func(t *testing.T, req *http.Request, tm auth.TokenMaker) {
+				addAuthToHeader(t, req, tm, time.Minute, authTypeBearer, userA.Username)
 			},
 			buildStubs: func(repo *mockdb.MockRepository) {
 				repo.EXPECT().
@@ -165,6 +187,9 @@ func TestCreateTransfer(t *testing.T) {
 				"amount":        transferAmount,
 				"currency":      "CAD",
 			},
+			setupAuth: func(t *testing.T, req *http.Request, tm auth.TokenMaker) {
+				addAuthToHeader(t, req, tm, time.Minute, authTypeBearer, userA.Username)
+			},
 			buildStubs: func(repo *mockdb.MockRepository) {
 				repo.EXPECT().
 					GetAccount(gomock.Any(), gomock.Eq(accA.ID)).
@@ -187,6 +212,9 @@ func TestCreateTransfer(t *testing.T) {
 				"toAccountID":   accB.ID,
 				"amount":        int64(-transferAmount), // sending 1 more than the account actually has
 				"currency":      accA.Currency,
+			},
+			setupAuth: func(t *testing.T, req *http.Request, tm auth.TokenMaker) {
+				addAuthToHeader(t, req, tm, time.Minute, authTypeBearer, userA.Username)
 			},
 			buildStubs: func(repo *mockdb.MockRepository) {
 				repo.EXPECT().
@@ -211,6 +239,9 @@ func TestCreateTransfer(t *testing.T) {
 				"amount":        accA.Balance + int64(1), // sending 1 more than the account actually has
 				"currency":      accA.Currency,
 			},
+			setupAuth: func(t *testing.T, req *http.Request, tm auth.TokenMaker) {
+				addAuthToHeader(t, req, tm, time.Minute, authTypeBearer, userA.Username)
+			},
 			buildStubs: func(repo *mockdb.MockRepository) {
 				repo.EXPECT().
 					GetAccount(gomock.Any(), gomock.Eq(accA.ID)).
@@ -234,6 +265,9 @@ func TestCreateTransfer(t *testing.T) {
 				"amount":        accA.Balance, // sending 1 more than the account actually has
 				"currency":      accA.Currency,
 			},
+			setupAuth: func(t *testing.T, req *http.Request, tm auth.TokenMaker) {
+				addAuthToHeader(t, req, tm, time.Minute, authTypeBearer, userA.Username)
+			},
 			buildStubs: func(repo *mockdb.MockRepository) {
 				repo.EXPECT().
 					GetAccount(gomock.Any(), gomock.Eq(accA.ID)).
@@ -250,11 +284,37 @@ func TestCreateTransfer(t *testing.T) {
 				require.Equal(t, http.StatusOK, resRec.Code)
 			},
 		},
+		{
+			name: "SendingToSameAccount",
+			body: gin.H{
+				"fromAccountID": accA.ID,
+				"toAccountID":   accA.ID,
+				"amount":        accA.Balance, // sending 1 more than the account actually has
+				"currency":      accA.Currency,
+			},
+			setupAuth: func(t *testing.T, req *http.Request, tm auth.TokenMaker) {
+				addAuthToHeader(t, req, tm, time.Minute, authTypeBearer, userA.Username)
+			},
+			buildStubs: func(repo *mockdb.MockRepository) {
+				repo.EXPECT().
+					GetAccount(gomock.Any(), gomock.Eq(accA.ID)).
+					Times(1).
+					Return(accA, nil)
+
+				repo.EXPECT().
+					GetAccount(gomock.Any(), gomock.Eq(accA.ID)).
+					Times(1).Return(accA, nil)
+
+				repo.EXPECT().TransferTx(gomock.Any(), gomock.Any()).Times(0)
+			},
+			checkResponse: func(resRec *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusBadRequest, resRec.Code)
+			},
+		},
 	}
 
 	for i := range testCases {
 		tc := testCases[i]
-		fmt.Println(i)
 
 		t.Run(tc.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
@@ -263,7 +323,7 @@ func TestCreateTransfer(t *testing.T) {
 			repo := mockdb.NewMockRepository(ctrl)
 			tc.buildStubs(repo)
 
-			server := NewServer(repo)
+			server := newTestServer(t, repo)
 			recorder := httptest.NewRecorder()
 
 			// prepare/marshal request data for the http POST request
@@ -273,6 +333,7 @@ func TestCreateTransfer(t *testing.T) {
 			req, err := http.NewRequest(http.MethodPost, "/transfers", bytes.NewReader(data))
 			require.NoError(t, err)
 
+			tc.setupAuth(t, req, server.tokenMaker)
 			server.router.ServeHTTP(recorder, req)
 
 			tc.checkResponse(recorder)

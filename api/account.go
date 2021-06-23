@@ -2,14 +2,16 @@ package api
 
 import (
 	"database/sql"
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/lib/pq"
+	"github.com/maxeth/go-bank-app/auth"
 	db "github.com/maxeth/go-bank-app/db/sqlc"
 )
 
 type createAccountRequest struct {
-	Owner    string `json:"owner" binding:"required"`
 	Currency string `json:"currency" binding:"required,currency"` // currency is a custom validation function, defined in api/validation/currency and applied inside server.go
 }
 
@@ -20,9 +22,27 @@ func (server *Server) createAccount(ctx *gin.Context) {
 		return
 	}
 
-	arg := db.CreateAccountParams{Owner: req.Owner, Currency: req.Currency, Balance: 0}
+	// get the callers username from the auth-token he sent in the headers
+	authPayload := ctx.MustGet(authPayloadKey).(*auth.Payload)
+
+	arg := db.CreateAccountParams{
+		Owner:    authPayload.Username,
+		Currency: req.Currency,
+		Balance:  0,
+	}
+
 	acc, err := server.repository.CreateAccount(ctx, arg)
 	if err != nil {
+		if pqErr, ok := err.(*pq.Error); ok {
+			// error is a pgError
+			switch pqErr.Code.Name() {
+			case "foreign_key_violation", "unique_violation":
+				{
+					ctx.JSON(http.StatusForbidden, pqErr.Error())
+					return
+				}
+			}
+		}
 		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
 		return
 	}
@@ -53,6 +73,14 @@ func (server *Server) getAccount(ctx *gin.Context) {
 		return
 	}
 
+	// only return if the fetched account has the same username as the one in the auth-token
+	authPayload := ctx.MustGet(authPayloadKey).(*auth.Payload)
+	if acc.Owner != authPayload.Username {
+		err := errors.New("not authorized to fetch this account")
+		ctx.JSON(http.StatusUnauthorized, err)
+		return
+	}
+
 	ctx.JSON(http.StatusOK, acc)
 }
 
@@ -69,7 +97,10 @@ func (server *Server) listAccounts(ctx *gin.Context) {
 		return
 	}
 
+	// only list the accounts from the owner of the query
+	authPayload := ctx.MustGet(authPayloadKey).(*auth.Payload)
 	args := db.ListAccountsParams{
+		Owner:  authPayload.Username,
 		Limit:  req.Limit,
 		Offset: (req.PageID - 1) * req.Limit,
 	}

@@ -9,28 +9,36 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
+	"github.com/maxeth/go-bank-app/auth"
 	mockdb "github.com/maxeth/go-bank-app/db/mock"
 	db "github.com/maxeth/go-bank-app/db/sqlc"
-	rnd "github.com/maxeth/go-bank-app/db/util"
+	library "github.com/maxeth/go-bank-app/library"
 	"github.com/stretchr/testify/require"
 )
 
 func TestGetAccountAPI(t *testing.T) {
 	// generate random acc that is then being returned by the stub
-	acc := generateRandomAccount()
+	user, _ := randomUser(t)
+	acc := generateRandomAccount(user.Username)
 
 	// define all our different test cases to get more coverage
 	testCases := []struct {
 		name          string
 		accountID     int64
+		setupAuth     func(t *testing.T, req *http.Request, tm auth.TokenMaker)
 		buildStubs    func(repo *mockdb.MockRepository)
 		checkResponse func(t *testing.T, resRec *httptest.ResponseRecorder)
 	}{
 		{
 			name:      "OK",
 			accountID: acc.ID,
+			setupAuth: func(t *testing.T, req *http.Request, tm auth.TokenMaker) {
+				// create a token witht he randomly created users username so that the requests are not being rejected
+				addAuthToHeader(t, req, tm, time.Minute, authTypeBearer, user.Username)
+			},
 			buildStubs: func(repo *mockdb.MockRepository) {
 				repo.EXPECT().
 					GetAccount(gomock.Any(), gomock.Eq(acc.ID)).
@@ -49,6 +57,9 @@ func TestGetAccountAPI(t *testing.T) {
 		{
 			name:      "NotFound",
 			accountID: acc.ID,
+			setupAuth: func(t *testing.T, req *http.Request, tm auth.TokenMaker) {
+				addAuthToHeader(t, req, tm, time.Minute, authTypeBearer, user.Username)
+			},
 			buildStubs: func(repo *mockdb.MockRepository) {
 				repo.EXPECT().
 					GetAccount(gomock.Any(), gomock.Eq(acc.ID)).
@@ -65,6 +76,9 @@ func TestGetAccountAPI(t *testing.T) {
 		{
 			name:      "InternalServerError",
 			accountID: acc.ID,
+			setupAuth: func(t *testing.T, req *http.Request, tm auth.TokenMaker) {
+				addAuthToHeader(t, req, tm, time.Minute, authTypeBearer, user.Username)
+			},
 			buildStubs: func(repo *mockdb.MockRepository) {
 				repo.EXPECT().
 					GetAccount(gomock.Any(), gomock.Eq(acc.ID)).
@@ -81,6 +95,9 @@ func TestGetAccountAPI(t *testing.T) {
 		{
 			name:      "InvalidID",
 			accountID: -1337,
+			setupAuth: func(t *testing.T, req *http.Request, tm auth.TokenMaker) {
+				addAuthToHeader(t, req, tm, time.Minute, authTypeBearer, user.Username)
+			},
 			buildStubs: func(repo *mockdb.MockRepository) {
 				repo.EXPECT().
 					GetAccount(gomock.Any(), gomock.Any()).
@@ -106,7 +123,7 @@ func TestGetAccountAPI(t *testing.T) {
 			tc.buildStubs(repo)
 
 			// start server and send request
-			server := NewServer(repo)
+			server := newTestServer(t, repo)
 			recorder := httptest.NewRecorder()
 
 			// request finding the random user with the id of each individual test case
@@ -114,6 +131,93 @@ func TestGetAccountAPI(t *testing.T) {
 			req, err := http.NewRequest(http.MethodGet, url, nil)
 
 			require.NoError(t, err)
+
+			tc.setupAuth(t, req, server.tokenMaker)
+			// serve just this one request
+			server.router.ServeHTTP(recorder, req)
+			tc.checkResponse(t, recorder)
+
+		})
+	}
+}
+
+func TestListAccountsAPI(t *testing.T) {
+	user, _ := randomUser(t)
+
+	n := 5
+	accs := make([]db.Account, n)
+	for i := 0; i < n; i++ {
+		accs[i] = generateRandomAccount(user.Username)
+	}
+
+	type Query struct {
+		Page  int
+		Limit int
+	}
+
+	testCases := []struct {
+		name          string
+		query         Query
+		setupAuth     func(t *testing.T, req *http.Request, tm auth.TokenMaker)
+		buildStubs    func(repo *mockdb.MockRepository)
+		checkResponse func(t *testing.T, resRec *httptest.ResponseRecorder)
+	}{
+		{
+			name: "OK",
+			query: Query{
+				Page:  1,
+				Limit: 5,
+			},
+			setupAuth: func(t *testing.T, req *http.Request, tm auth.TokenMaker) {
+				// create a token witht he randomly created users username so that the requests are not being rejected
+				addAuthToHeader(t, req, tm, time.Minute, authTypeBearer, user.Username)
+			},
+			buildStubs: func(repo *mockdb.MockRepository) {
+				args := db.ListAccountsParams{
+					Owner:  user.Username,
+					Limit:  int32(n),
+					Offset: 0,
+				}
+				repo.EXPECT().
+					ListAccounts(gomock.Any(), gomock.Eq(args)).
+					Times(1).
+					Return(accs, nil)
+
+			},
+			checkResponse: func(t *testing.T, resRec *httptest.ResponseRecorder) {
+				// verify that the random user we created at the top was fetched and returned
+				require.Equal(t, http.StatusOK, resRec.Code)
+				requireBodyAccountsArrayMatch(t, resRec.Body, accs)
+			},
+		},
+	}
+
+	for i := range testCases {
+		tc := testCases[i]
+
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			repo := mockdb.NewMockRepository(ctrl)
+			tc.buildStubs(repo)
+
+			// start server and send request
+			server := newTestServer(t, repo)
+			recorder := httptest.NewRecorder()
+
+			// request finding the random user with the id of each individual test case
+			url := "/accounts"
+			req, err := http.NewRequest(http.MethodGet, url, nil)
+			require.NoError(t, err)
+
+			// add query params for limit and page
+			q := req.URL.Query()
+			q.Add("page", fmt.Sprintf("%v", tc.query.Page))
+			q.Add("limit", fmt.Sprintf("%v", tc.query.Limit))
+			req.URL.RawQuery = q.Encode()
+
+			tc.setupAuth(t, req, server.tokenMaker)
 
 			// serve just this one request
 			server.router.ServeHTTP(recorder, req)
@@ -123,12 +227,12 @@ func TestGetAccountAPI(t *testing.T) {
 	}
 }
 
-func generateRandomAccount() db.Account {
+func generateRandomAccount(owner string) db.Account {
 	return db.Account{
-		ID:       rnd.RandomInt(1, 100),
-		Owner:    rnd.RandomOwner(),
-		Balance:  rnd.RandomBalance(),
-		Currency: rnd.RandomCurrency(),
+		ID:       library.RandomInt(1, 100),
+		Owner:    owner,
+		Balance:  library.RandomBalance(),
+		Currency: library.RandomCurrency(),
 	}
 }
 
@@ -141,4 +245,14 @@ func requireBodyAccountMatch(t *testing.T, body *bytes.Buffer, got db.Account) {
 	require.NoError(t, err)
 
 	require.Equal(t, got, have)
+}
+
+func requireBodyAccountsArrayMatch(t *testing.T, body *bytes.Buffer, accounts []db.Account) {
+	data, err := ioutil.ReadAll(body)
+	require.NoError(t, err)
+
+	var gotAccounts []db.Account
+	err = json.Unmarshal(data, &gotAccounts)
+	require.NoError(t, err)
+	require.Equal(t, accounts, gotAccounts)
 }

@@ -2,7 +2,7 @@ package api
 
 import (
 	"github.com/go-playground/validator/v10"
-	"github.com/maxeth/go-bank-app/currency"
+	library "github.com/maxeth/go-bank-app/library"
 )
 
 var validCurrency validator.Func = func(fl validator.FieldLevel) bool {
@@ -10,7 +10,7 @@ var validCurrency validator.Func = func(fl validator.FieldLevel) bool {
 
 	if ok {
 		// field is a string, check whether it is a valid currency
-		return currency.IsSupportedCurrency(val)
+		return library.IsSupportedCurrency(val)
 	}
 
 	// field is not a string so it cannot be a supported currency
