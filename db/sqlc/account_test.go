@@ -7,28 +7,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	util "github.com/maxeth/go-bank-app/db/util"
+	library "github.com/maxeth/go-bank-app/library"
 )
-
-func createRandomAccount(t *testing.T) Account {
-	arg := CreateAccountParams{
-		Owner:    util.RandomOwner(),
-		Balance:  util.RandomBalance(),
-		Currency: util.RandomCurrency(),
-	}
-
-	acc, err := testQueries.CreateAccount(context.Background(), arg)
-	require.Nil(t, err)
-
-	require.Equal(t, arg.Owner, acc.Owner)
-	require.Equal(t, arg.Balance, acc.Balance)
-	require.Equal(t, arg.Currency, acc.Currency)
-
-	require.NotZero(t, acc.ID)
-	require.NotZero(t, acc.CreatedAt)
-
-	return acc
-}
 
 func TestCreateAccount(t *testing.T) {
 	createRandomAccount(t)
@@ -51,7 +31,7 @@ func TestUpdateAccount(t *testing.T) {
 
 	arg := UpdateAccountBalanceParams{
 		ID:      acc.ID,
-		Balance: util.RandomBalance(),
+		Balance: library.RandomBalance(),
 	}
 
 	res, err := testQueries.UpdateAccountBalance(context.Background(), arg)
@@ -81,21 +61,45 @@ func TestDeleteAccount(t *testing.T) {
 }
 
 func TestListAccounts(t *testing.T) {
+	var lastAcc Account
 	for i := 0; i < 10; i++ {
-		createRandomAccount(t)
+		lastAcc = createRandomAccount(t)
 	}
 
 	arg := ListAccountsParams{
+		Owner:  lastAcc.Owner,
 		Limit:  5,
-		Offset: 5,
+		Offset: 0,
 	}
 
 	accs, err := testQueries.ListAccounts(context.Background(), arg)
 
 	require.Nil(t, err)
-	require.Len(t, accs, 5)
+	require.NotEmpty(t, accs)
 
 	for _, acc := range accs {
 		require.NotEmpty(t, acc)
+		require.Equal(t, lastAcc.Owner, acc.Owner)
 	}
+}
+func createRandomAccount(t *testing.T) Account {
+	user := createRandomUser(t)
+
+	arg := CreateAccountParams{
+		Owner:    user.Username,
+		Balance:  library.RandomBalance(),
+		Currency: library.RandomCurrency(),
+	}
+
+	acc, err := testQueries.CreateAccount(context.Background(), arg)
+	require.Nil(t, err)
+
+	require.Equal(t, arg.Owner, acc.Owner)
+	require.Equal(t, arg.Balance, acc.Balance)
+	require.Equal(t, arg.Currency, acc.Currency)
+
+	require.NotZero(t, acc.ID)
+	require.NotZero(t, acc.CreatedAt)
+
+	return acc
 }

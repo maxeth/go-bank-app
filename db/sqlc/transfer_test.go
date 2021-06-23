@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	db "github.com/maxeth/go-bank-app/db/util"
+	library "github.com/maxeth/go-bank-app/library"
 	"github.com/stretchr/testify/require"
 )
 
@@ -13,7 +13,7 @@ func createRandomTransfer(t *testing.T, from, to Account) Transfer {
 	args := CreateTransferParams{
 		FromAccountID: from.ID,
 		ToAccountID:   to.ID,
-		Amount:        db.RandomMoney(),
+		Amount:        library.RandomMoney(),
 	}
 
 	trf, err := testQueries.CreateTransfer(context.Background(), args)

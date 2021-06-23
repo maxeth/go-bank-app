@@ -1,11 +1,11 @@
 package db
 
 import (
-	"fmt"
 	"os"
 	"testing"
 
 	_ "github.com/lib/pq"
+	"github.com/maxeth/go-bank-app/config"
 )
 
 var (
@@ -14,9 +14,13 @@ var (
 
 func TestMain(m *testing.M) {
 
-	dbConn, err := GetOrCreate()
+	c, err := config.New("../../")
 	if err != nil {
-		fmt.Println(err.Error())
+		panic("couldn't load config env file")
+	}
+
+	dbConn, err := GetOrCreate(c)
+	if err != nil {
 		panic("Cannot test because db connection fails")
 	}
 

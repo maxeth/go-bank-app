@@ -2,7 +2,6 @@ package db
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -20,19 +19,17 @@ func TestTransferTx(t *testing.T) {
 
 	const txAmount int64 = 50
 	const txCount int64 = 5
-	fmt.Printf("amount is %v", txAmount)
 	for i := 0; i < int(txCount); i++ {
 		go func() {
 			txParams := TransferTxParams{FromAccountID: accA.ID, ToAccountID: accB.ID, Amount: txAmount}
 			result, err := repo.TransferTx(context.Background(), txParams)
-			fmt.Println(result.Transfer, " IS THE TRANSFER RESULT")
 			errs <- err
 			results <- result
 		}()
 	}
 
 	for i := 0; i < int(txCount); i++ {
-		fmt.Println(">> count: ", i)
+		//	fmt.Println(">> count: ", i)
 		err := <-errs
 		require.NoError(t, err)
 
@@ -98,7 +95,7 @@ func TestTransferTx(t *testing.T) {
 	updatedB, err := testQueries.GetAccount(context.Background(), accB.ID)
 	require.NoError(t, err)
 
-	fmt.Println(">> ", accA.Balance, accB.Balance)
+	//fmt.Println(">> ", accA.Balance, accB.Balance)
 
 	require.Equal(t, updatedA.Balance, accA.Balance-txCount*txAmount)
 	require.Equal(t, updatedB.Balance, accB.Balance+txCount*txAmount)
